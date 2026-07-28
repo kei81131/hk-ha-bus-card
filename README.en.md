@@ -18,6 +18,9 @@ Citybus, Green Minibus, and New Lantao Bus services.
 - Refresh automatically after a query starts and stop after 15 minutes by default
 - Configure the ETA display window, maximum routes, arrivals per route, and refresh interval
 - Sort routes by the earliest arrival time
+- List selected routes in each direction button's secondary text, sorted naturally by route number
+- Hide official stop codes appended to stop names while preserving the complete actual stop name
+- Use a solid theme colour for the selected direction button to provide clear contrast
 
 ## Install with HACS
 
@@ -46,7 +49,7 @@ Citybus, Green Minibus, and New Lantao Bus services.
 2. Go to **Settings > Dashboards > Resources** and add this JavaScript module:
 
    ```text
-   /local/community/hk-ha-bus-card/hk-ha-bus-card.js?v=1.3.2
+   /local/community/hk-ha-bus-card/hk-ha-bus-card.js?v=1.3.3
    ```
 
 3. Clear the browser cache and reload. If the Home Assistant Companion App
@@ -144,8 +147,8 @@ closed, keep the query scheduler in Home Assistant or Node-RED.
   browser cache and reload.
 - **The old card is still loaded**: increase the version number at the end of
   the resource URL, for example
-  `/local/community/hk-ha-bus-card/hk-ha-bus-card.js?v=1.3.3`.
-- **Cards on different pages show the same query result**: upgrade to 1.3.2 and
+  `/local/community/hk-ha-bus-card/hk-ha-bus-card.js?v=1.3.4`.
+- **Cards on different pages show the same query result**: upgrade to 1.3.2 or later and
   set `session_key` to `auto`. The legacy default `hk_ha_bus_card` is also
   treated as `auto` automatically.
 - **The card is clipped in a Sections view**: enter dashboard edit mode, open

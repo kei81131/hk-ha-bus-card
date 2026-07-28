@@ -18,6 +18,9 @@ Home Assistant Custom Card 可以直接查詢香港九巴、城巴、嶼巴、�
 - 查詢啟動後會定時更新，預設 15 分鐘後自動停止
 - 可以設定 ETA 顯示範圍、最多路線、每線班次數目同更新間隔
 - 路線按最快到站時間排序
+- 方向按鈕副標題會列出已選路線，並按路線號碼由小至大排列
+- Card 內會隱藏站名結尾嘅官方站碼，但保留完整實際站名
+- 已選方向按鈕使用實色主題色，與未選按鈕有清晰對比
 
 ## 使用 HACS 安裝
 
@@ -44,7 +47,7 @@ Home Assistant Custom Card 可以直接查詢香港九巴、城巴、嶼巴、�
 2. 去 **Settings > Dashboards > Resources**，加入 JavaScript Module：
 
    ```text
-   /local/community/hk-ha-bus-card/hk-ha-bus-card.js?v=1.3.2
+   /local/community/hk-ha-bus-card/hk-ha-bus-card.js?v=1.3.3
    ```
 
 3. 清除瀏覽器快取並重新載入。Home Assistant Companion App 如仍然使用
@@ -131,8 +134,8 @@ Card 會儲存所選路線巴士站嘅官方名稱。唔需要手動輸入共用
 - **顯示 Custom element doesn't exist**：檢查 Resource 路徑，然後清除
   瀏覽器快取並重新載入。
 - **仍然載入舊 Card**：增加 Resource URL 後面嘅版本號，例如
-  `/local/community/hk-ha-bus-card/hk-ha-bus-card.js?v=1.3.3`。
-- **不同頁面嘅 Card 顯示同一個查詢結果**：升級至 1.3.2，並將
+  `/local/community/hk-ha-bus-card/hk-ha-bus-card.js?v=1.3.4`。
+- **不同頁面嘅 Card 顯示同一個查詢結果**：升級至 1.3.2 或以上，並將
   `session_key` 設成 `auto`。舊預設值 `hk_ha_bus_card` 亦會自動當成
   `auto` 處理。
 - **Sections View 入面 Card 被裁切**：進入 Dashboard 編輯模式，開啟 Card

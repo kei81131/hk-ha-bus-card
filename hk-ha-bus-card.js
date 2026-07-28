@@ -1,4 +1,4 @@
-const HK_HA_BUS_CARD_VERSION = "1.3.2";
+const HK_HA_BUS_CARD_VERSION = "1.3.3";
 const KMB_API = "https://data.etabus.gov.hk/v1/transport/kmb";
 const GMB_API = "https://data.etagmb.gov.hk";
 const CTB_API = "https://rt.data.gov.hk/v2/transport/citybus";
@@ -47,6 +47,19 @@ const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => 
   '"': "&quot;",
   "'": "&#039;"
 })[char]);
+
+function compareRouteNumbers(first, second) {
+  return String(first).localeCompare(String(second), "zh-HK", {
+    numeric: true,
+    sensitivity: "base"
+  });
+}
+
+function cleanStopDisplayName(value) {
+  return String(value || "")
+    .replace(/\s*[（(]\s*[A-Z]{1,4}\d{2,5}\s*[）)]\s*$/i, "")
+    .trim();
+}
 
 function hashSessionIdentity(value) {
   let hash = 2166136261;
@@ -681,22 +694,22 @@ class HkHaBusCard extends HTMLElement {
   }
 
   _directionSubtitle(direction) {
-    const stops = [...new Set(
-      (direction.routes || []).map((route) => String(route.stop_name || "").trim()).filter(Boolean)
-    )];
-    if (!stops.length) return "尚未加入路線及車站";
-    if (stops.length === 1) return stops[0];
-    return `${stops.length} 個已選車站`;
+    const routes = [...new Set(
+      (direction.routes || [])
+        .map((route) => String(route.route || "").trim().toUpperCase())
+        .filter(Boolean)
+    )].sort(compareRouteNumbers);
+    return routes.length ? `路線：${routes.join("、")}` : "尚未加入路線";
   }
 
   _routeStopName(routeResult) {
-    if (routeResult.stop_name) return routeResult.stop_name;
+    if (routeResult.stop_name) return cleanStopDisplayName(routeResult.stop_name);
     const configured = (this._activeDirection?.routes || []).find((route) =>
       route.operator === routeResult.operator &&
       route.route === routeResult.route &&
       (!routeResult.stop_id || String(route.stop_id) === String(routeResult.stop_id))
     );
-    return configured?.stop_name || "未命名車站";
+    return cleanStopDisplayName(configured?.stop_name) || "未命名車站";
   }
 
   _message(icon, title, detail) {
@@ -814,13 +827,14 @@ class HkHaBusCard extends HTMLElement {
         .header { padding:16px 16px 12px; }
         .title { margin-bottom:12px; font-size:18px; font-weight:800; }
         .direction-buttons { display:grid; grid-template-columns:repeat(${Math.max(1, directions.length)},minmax(0,1fr)); gap:10px; }
-        .direction-button { appearance:none; display:flex; align-items:center; gap:10px; min-width:0; padding:13px 12px; border:1px solid var(--divider-color); border-radius:14px; color:var(--primary-text-color); background:color-mix(in srgb,var(--card-background-color) 90%,var(--primary-color)); cursor:pointer; text-align:left; transition:.18s ease; }
-        .direction-button:hover { border-color:var(--primary-color); transform:translateY(-1px); }
-        .direction-button.active { border-color:var(--primary-color); background:color-mix(in srgb,var(--primary-color) 14%,var(--card-background-color)); box-shadow:0 0 0 1px color-mix(in srgb,var(--primary-color) 55%,transparent); }
+        .direction-button { appearance:none; display:flex; align-items:center; gap:10px; min-width:0; padding:13px 12px; border:1px solid color-mix(in srgb,var(--divider-color) 72%,var(--secondary-text-color)); border-radius:14px; color:var(--primary-text-color); background:color-mix(in srgb,var(--card-background-color) 96%,var(--secondary-text-color)); opacity:.7; filter:saturate(.65); cursor:pointer; text-align:left; transition:opacity .18s ease,filter .18s ease,transform .18s ease,box-shadow .18s ease,background .18s ease; }
+        .direction-button:hover { border-color:var(--primary-color); opacity:.92; filter:none; transform:translateY(-1px); }
+        .direction-button.active { border-color:var(--primary-color); color:var(--text-primary-color,#fff); background:var(--primary-color); opacity:1; filter:none; box-shadow:0 0 0 2px color-mix(in srgb,var(--primary-color) 38%,transparent),0 5px 14px color-mix(in srgb,var(--primary-color) 34%,transparent); }
         .button-icon { flex:0 0 auto; font-size:24px; }
         .button-copy { min-width:0; display:flex; flex-direction:column; gap:2px; }
         .button-copy strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:15px; }
-        .button-copy small { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--secondary-text-color); font-size:11px; }
+        .button-copy small { color:var(--secondary-text-color); font-size:11px; line-height:1.25; white-space:normal; overflow-wrap:anywhere; }
+        .direction-button.active .button-copy small { color:color-mix(in srgb,var(--text-primary-color,#fff) 82%,transparent); }
         .status { padding:9px 16px; border-top:1px solid var(--divider-color); border-bottom:1px solid var(--divider-color); color:var(--secondary-text-color); background:color-mix(in srgb,var(--card-background-color) 94%,var(--primary-text-color)); font-size:11px; text-align:center; }
         .route-row { padding:15px 14px 18px; }
         .route-row + .route-row { border-top:1px solid var(--divider-color); }
