@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800" role="img" aria-labelledby="title description">
+  <title id="title">HK HA Bus Card preview</title>
+  <desc id="description">A generic Home Assistant bus arrival card with direction buttons and three timeline rows.</desc>
+  <rect width="1200" height="800" fill="#f2f4f7"/>
+  <rect x="70" y="42" width="1060" height="716" rx="30" fill="#fff" stroke="#d9dde3" stroke-width="2"/>
+  <text x="110" y="94" fill="#202124" font-family="Arial, sans-serif" font-size="28" font-weight="700">HK HA Bus Card</text>
+
+  <rect x="110" y="120" width="465" height="76" rx="18" fill="#e9f5ee" stroke="#168f48" stroke-width="3"/>
+  <text x="140" y="151" font-family="Arial, sans-serif" font-size="24">&#x1F68C;</text>
+  <text x="188" y="151" fill="#202124" font-family="Arial, sans-serif" font-size="19" font-weight="700">Outbound</text>
+  <text x="188" y="177" fill="#667085" font-family="Arial, sans-serif" font-size="15">Example Stop A</text>
+
+  <rect x="595" y="120" width="465" height="76" rx="18" fill="#fff" stroke="#d9dde3" stroke-width="2"/>
+  <text x="625" y="151" font-family="Arial, sans-serif" font-size="24">&#x1F68C;</text>
+  <text x="673" y="151" fill="#202124" font-family="Arial, sans-serif" font-size="19" font-weight="700">Return</text>
+  <text x="673" y="177" fill="#667085" font-family="Arial, sans-serif" font-size="15">Example Stop B</text>
+
+  <rect x="70" y="216" width="1060" height="42" fill="#f8f9fa"/>
+  <line x1="70" y1="216" x2="1130" y2="216" stroke="#e5e7eb"/>
+  <line x1="70" y1="258" x2="1130" y2="258" stroke="#e5e7eb"/>
+  <text x="600" y="243" text-anchor="middle" fill="#667085" font-family="Arial, sans-serif" font-size="15">Live updates &#x2022; about 12 minutes remaining &#x2022; 14:36</text>
+
+  <g transform="translate(0 0)">
+    <rect x="110" y="286" width="82" height="48" rx="9" fill="#cf2027"/>
+    <text x="151" y="319" text-anchor="middle" fill="#fff" font-family="Arial, sans-serif" font-size="28" font-weight="700">1A</text>
+    <text x="210" y="316" fill="#667085" font-family="Arial, sans-serif" font-size="15">KMB</text>
+    <text x="600" y="317" text-anchor="middle" fill="#202124" font-family="Arial, sans-serif" font-size="21" font-weight="700">&#x279C; Outbound</text>
+    <text x="1050" y="317" text-anchor="end" fill="#0787b1" font-family="Arial, sans-serif" font-size="17" font-weight="700">&#x1F4CD; Example Stop A</text>
+    <text x="110" y="375" fill="#2e9d62" font-family="Arial, sans-serif" font-size="17" font-weight="700">NOW</text>
+    <line x1="180" y1="368" x2="1060" y2="368" stroke="#555" stroke-width="4" stroke-linecap="round"/>
+    <circle cx="260" cy="368" r="16" fill="#e0483e" stroke="#fff" stroke-width="5"/>
+    <circle cx="260" cy="368" r="21" fill="none" stroke="#a93b34" stroke-width="3"/>
+    <text x="260" y="414" text-anchor="middle" fill="#d83c32" font-family="Arial, sans-serif" font-size="22" font-weight="700">2 min</text>
+    <circle cx="500" cy="368" r="16" fill="#079fc4" stroke="#fff" stroke-width="5"/>
+    <circle cx="500" cy="368" r="21" fill="none" stroke="#08667d" stroke-width="3"/>
+    <text x="500" y="414" text-anchor="middle" fill="#202124" font-family="Arial, sans-serif" font-size="22" font-weight="700">10 min</text>
+    <circle cx="885" cy="368" r="16" fill="#079fc4" stroke="#fff" stroke-width="5"/>
+    <circle cx="885" cy="368" r="21" fill="none" stroke="#08667d" stroke-width="3"/>
+    <text x="885" y="414" text-anchor="middle" fill="#202124" font-family="Arial, sans-serif" font-size="22" font-weight="700">23 min</text>
+  </g>
+
+  <line x1="70" y1="446" x2="1130" y2="446" stroke="#e5e7eb" stroke-width="2"/>
+  <g transform="translate(0 186)">
+    <rect x="110" y="286" width="82" height="48" rx="9" fill="#168f48"/>
+    <text x="151" y="319" text-anchor="middle" fill="#fff" font-family="Arial, sans-serif" font-size="28" font-weight="700">23</text>
+    <text x="210" y="316" fill="#667085" font-family="Arial, sans-serif" font-size="15">GMB</text>
+    <text x="600" y="317" text-anchor="middle" fill="#202124" font-family="Arial, sans-serif" font-size="21" font-weight="700">&#x279C; Outbound</text>
+    <text x="1050" y="317" text-anchor="end" fill="#0787b1" font-family="Arial, sans-serif" font-size="17" font-weight="700">&#x1F4CD; Example Stop A</text>
+    <text x="110" y="375" fill="#2e9d62" font-family="Arial, sans-serif" font-size="17" font-weight="700">NOW</text>
+    <line x1="180" y1="368" x2="1060" y2="368" stroke="#555" stroke-width="4" stroke-linecap="round"/>
+    <circle cx="350" cy="368" r="16" fill="#079fc4" stroke="#fff" stroke-width="5"/>
+    <circle cx="350" cy="368" r="21" fill="none" stroke="#08667d" stroke-width="3"/>
+    <text x="350" y="414" text-anchor="middle" fill="#202124" font-family="Arial, sans-serif" font-size="22" font-weight="700">5 min</text>
+    <circle cx="650" cy="368" r="16" fill="#079fc4" stroke="#fff" stroke-width="5"/>
+    <circle cx="650" cy="368" r="21" fill="none" stroke="#08667d" stroke-width="3"/>
+    <text x="650" y="414" text-anchor="middle" fill="#202124" font-family="Arial, sans-serif" font-size="22" font-weight="700">15 min</text>
+    <circle cx="975" cy="368" r="16" fill="#079fc4" stroke="#fff" stroke-width="5"/>
+    <circle cx="975" cy="368" r="21" fill="none" stroke="#08667d" stroke-width="3"/>
+    <text x="975" y="414" text-anchor="middle" fill="#202124" font-family="Arial, sans-serif" font-size="22" font-weight="700">26 min</text>
+  </g>
+</svg>
