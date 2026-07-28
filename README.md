@@ -2,8 +2,8 @@
 
 # HK HA Bus Card
 
-Home Assistant Custom Card 可以直接查詢香港九巴、城巴、
-專線小巴同嶼巴嘅到站時間。
+Home Assistant Custom Card 可以直接查詢香港九巴、城巴、嶼巴、專線小巴嘅到站時間。
+以方便經常查詢指定地點, 指定路線的到站時間
 
 ![HK HA Bus Card 預覽](images/preview.png)
 
