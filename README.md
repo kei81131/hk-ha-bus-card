@@ -1,64 +1,59 @@
+**廣東話** | [English](README.en.md)
+
 # HK HA Bus Card
 
-A frontend-only Home Assistant custom card for Hong Kong KMB, Citybus, Green
-Minibus, and New Lantao Bus arrival times. It queries the public
-transport APIs directly from the browser, so it does not require Node-RED,
-helper entities, scenes, automations, or `card-mod`.
+Home Assistant Custom Card 可以直接查詢香港九巴、城巴、
+專線小巴同嶼巴嘅到站時間。
 
-![HK HA Bus Card preview](images/preview.png)
+![HK HA Bus Card 預覽](images/preview.png)
 
-## Features
+## 功能
 
-- Route-first GUI search across all supported operators
-- Operator, actual route direction, and stop selection from live route data
-- Automatic KMB + Citybus joint-route discovery and merged ETA results
-- Every displayed stop name comes from the selected route stop
-- No ETA request until a direction button is pressed
-- Automatic refresh while a 15-minute browser session is active
-- Browser-session recovery when navigating or reloading Home Assistant views
-- Configurable ETA window, route count, arrival count, and refresh interval
-- Routes sorted by the earliest usable ETA
-- Linear timeline with collision lanes for arrivals close together
-- Operator route colours, urgent-arrival highlighting, and dark mode support
-- Automatic content height in Home Assistant Sections views
-- No built-in directions or personal stop IDs
+- 先輸入路線號碼，再搜尋所有支援嘅營辦商
+- 從官方路線資料選擇實際行車方向同巴士站
+- 自動識別及合併九巴＋城巴聯營路線嘅 ETA
+- 聯營線嘅九巴特別／短程班次會保留喺同一個路線群組
+- 顯示站名直接來自所選路線嘅官方巴士站資料
+- 開啟 Dashboard 時唔會自動查詢，必須撳方向按鈕先開始
+- 查詢啟動後會定時更新，預設 15 分鐘後自動停止
+- 可以設定 ETA 顯示範圍、最多路線、每線班次數目同更新間隔
+- 路線按最快到站時間排序
 
-## Install with HACS
+## 使用 HACS 安裝
 
-1. In HACS, open the top-right menu and select **Custom repositories**.
-2. Add this GitHub repository and select the **Dashboard** category.
-3. Download **HK HA Bus Card**.
-4. Confirm that the following JavaScript module resource exists under
-   **Settings > Dashboards > Resources**:
+1. 開啟 HACS，撳右上角選單，再選擇 **Custom repositories**。
+2. 加入呢個 GitHub Repository，Category 選擇 **Dashboard**。
+3. 下載 **HK HA Bus Card**。
+4. 去 **Settings > Dashboards > Resources**，確認有以下 JavaScript Module：
 
    ```text
    /hacsfiles/hk-ha-bus-card/hk-ha-bus-card.js
    ```
 
-5. Reload Home Assistant without browser cache, then add **HK HA Bus Card**
-   from the card picker.
+5. 清除瀏覽器快取並重新載入 Home Assistant，之後喺 Card Picker 加入
+   **HK HA Bus Card**。
 
-## Manual installation
+## 手動安裝
 
-1. Create the card directory and copy `hk-ha-bus-card.js` to:
+1. 建立資料夾，將 `hk-ha-bus-card.js` 放到：
 
    ```text
    /config/www/community/hk-ha-bus-card/hk-ha-bus-card.js
    ```
 
-2. In **Settings > Dashboards > Resources**, add a JavaScript module resource:
+2. 去 **Settings > Dashboards > Resources**，加入 JavaScript Module：
 
    ```text
-   /local/community/hk-ha-bus-card/hk-ha-bus-card.js?v=1.3.0
+   /local/community/hk-ha-bus-card/hk-ha-bus-card.js?v=1.3.1
    ```
 
-3. Reload the browser without cache. In the Home Assistant Companion App,
-   fully close and reopen the app if it still uses an older resource.
+3. 清除瀏覽器快取並重新載入。Home Assistant Companion App 如仍然使用
+   舊版本，請完全關閉 App 後再開。
 
-4. Add **HK HA Bus Card** from the card picker, then use its GUI editor to add
-   at least one direction, route, and stop.
+4. 喺 Card Picker 加入 **HK HA Bus Card**，再使用圖像化編輯器加入最少
+   一個方向、路線同巴士站。
 
-Minimal YAML:
+最簡設定：
 
 ```yaml
 type: custom:hk-ha-bus-card
@@ -72,110 +67,74 @@ max_arrivals: 3
 directions: []
 ```
 
-The card deliberately ships with `directions: []`. Configure routes through
-the visual editor instead of copying another user's route and stop IDs.
+Card 預設使用 `directions: []`，請透過圖像化編輯器設定自己嘅路線，
+唔好直接複製其他使用者嘅路線及巴士站 ID。
 
-## Card Editor
+## Card Editor 使用方法
 
-For each direction:
+每個查詢方向嘅設定步驟：
 
-1. Enter the direction button name.
-2. Enter a route number and select **搜尋營辦商**.
-3. If more than one unrelated operator matches, select KMB, Citybus, Green
-   Minibus, or New Lantao Bus. KMB + Citybus joint routes such as 117 are
-   combined automatically, so there is no separate operator choice.
-4. Select the route's actual service direction and bus stop.
-5. Select **加入這條路線**.
+1. 輸入方向按鈕名稱，例如「返屋企」或「去公司」。
+2. 輸入巴士路線，再撳 **搜尋營辦商**。
+3. 如果路線號碼屬於幾個無關營辦商，先選擇九巴、城巴、專線小巴或
+   嶼巴。117、118 等九巴＋城巴聯營線會自動歸入同一群組，毋須分開選擇
+   九巴或城巴。
+4. 選擇路線嘅實際行車方向及巴士站。
+5. 撳 **加入這條路線**。
 
-The card stores the name returned by the selected route-stop record. There is
-no manually entered shared stop name, and different routes in one direction
-may use different stops.
+部分聯營路線會由官方 API 提供九巴獨營嘅特別或短程班次，例如 118
+由旺角、紅隧或柴灣開出嘅班次。呢啲班次仍會顯示喺同一個聯營路線群組
+嘅「路線方向」選單；如果揀咗九巴獨營班次，結果行會正確顯示「九巴」。
 
-The direction name configured at the top is only used on the query button.
-Every result row shows the actual destination returned by that route's live
-route record.
+Card 會儲存所選路線巴士站嘅官方名稱。唔需要手動輸入共用站名，同一個
+方向內嘅不同路線亦可以選擇不同巴士站。
 
-The editor only calls route and stop discovery endpoints. It does not start ETA
-polling; normal ETA requests still require pressing a direction button on the
-dashboard.
+最上方設定嘅方向名稱只會用喺查詢按鈕。每條結果路線顯示嘅方向，會使用
+該路線官方資料入面嘅實際目的地。
 
-## Configuration
+編輯器只會呼叫路線及巴士站搜尋 API，唔會啟動 ETA 定時查詢。正常 ETA
+查詢仍然要喺 Dashboard 撳方向按鈕先會開始。
 
-| Option | Default | Description |
+## 設定選項
+
+| 選項 | 預設值 | 說明 |
 | --- | ---: | --- |
-| `title` | `HK HA Bus Card` | Card heading |
-| `session_key` | `hk_ha_bus_card` | Shares one browser-local query between card instances |
-| `update_interval` | `30` | Refresh interval in seconds; minimum 10 |
-| `session_minutes` | `15` | Time before automatic expiry |
-| `display_window` | `30` | Only show arrivals within this many minutes |
-| `max_routes` | `3` | Show the fastest routes only |
-| `max_arrivals` | `3` | Maximum arrivals shown per route |
-| `directions` | `[]` | Direction and route definitions created by the editor |
+| `title` | `HK HA Bus Card` | Card 標題 |
+| `session_key` | `hk_ha_bus_card` | 讓同一瀏覽器內多張 Card 共用一個查詢 Session |
+| `update_interval` | `30` | 更新間隔秒數，最低 10 秒 |
+| `session_minutes` | `15` | 幾多分鐘後自動停止查詢 |
+| `display_window` | `30` | 只顯示呢個分鐘範圍內嘅班次 |
+| `max_routes` | `3` | 只顯示最快到達嘅路線數目 |
+| `max_arrivals` | `3` | 每條路線最多顯示幾班車 |
+| `directions` | `[]` | 由 Card Editor 建立嘅方向及路線設定 |
 
-Use a different `session_key` when two cards should run independently. Use the
-same key when copies of the same card should reconnect to one active query.
+如果兩張 Card 要獨立查詢，請使用不同 `session_key`。如果兩張 Card 應該
+接駁同一個查詢 Session，就使用相同 `session_key`。
 
-## Runtime behaviour
+## 查詢運作方式
 
-- Loading a card with no saved active session performs zero ETA requests.
-- Pressing a direction starts an immediate query and periodic updates.
-- Pressing again or changing direction aborts the older request and restarts
-  the session timer.
-- Active state is kept in a page-global owner and mirrored to `sessionStorage`.
-  This allows both SPA navigation and full Home Assistant frontend reloads in
-  the same browser tab to resume the remaining session.
-- An expired session is removed and does not restart automatically.
-- Each browser tab/device has its own session. Closing the tab, clearing site
-  storage, signing out, or using private browsing may end it.
+- 冇已儲存 Session 時，載入 Card 唔會發出任何 ETA 請求。
+- 撳方向按鈕後會立即查詢，之後按設定間隔更新。
+- 重複撳同一按鈕或轉換方向，會取消舊請求並重新計算 Session 時間。
+- 查詢狀態會保留喺頁面全域 Owner，並同步到 `sessionStorage`，所以同一個
+  瀏覽器分頁切換 View 或重新載入 Home Assistant 後仍可恢復。
+- Session 過期後會停止更新，亦唔會自動重新啟動。
+- 每個瀏覽器分頁或裝置各自擁有 Session。關閉分頁、清除網站資料、登出
+  或使用私人瀏覽模式，都可能令 Session 結束。
 
-For a server-side session shared across devices or available when every browser
-is closed, keep the query scheduler in Home Assistant or Node-RED instead.
+如果需要跨裝置共用、或者所有瀏覽器關閉後仍然繼續查詢，就要將查詢排程
+保留喺 Home Assistant 或 Node-RED。
 
-## Troubleshooting
+## 常見問題
 
-- **Custom element doesn't exist**: check the resource path and reload without
-  cache.
-- **Old card remains loaded**: increment the resource query suffix, for example
-  `/local/community/hk-ha-bus-card/hk-ha-bus-card.js?v=1.3.1`.
-- **Card is clipped in a Sections view after upgrading**: open the card menu
-  while editing the dashboard and select **Reset size**. If YAML mode contains
-  a saved `grid_options.rows`, remove that `rows` value. Version 1.3.0 leaves
-  the row count automatic so the card grows with the displayed routes.
-- **One device cannot query ETA**: check whether its browser, DNS, or network
-  blocks `data.etabus.gov.hk`, `data.etagmb.gov.hk`, or `rt.data.gov.hk`.
-- **No direction buttons appear**: open the Card Editor and configure routes;
-  this project intentionally has no default directions.
-
-## Upgrading from `custom:spk-bus-card`
-
-Replace the old resource with
-`/local/community/hk-ha-bus-card/hk-ha-bus-card.js?v=1.3.0`, then change the
-card type to:
-
-```yaml
-type: custom:hk-ha-bus-card
-```
-
-The tag, resource filename, default `session_key`, and browser storage prefix
-changed in version 1.1.0. Reopen the editor and save your route configuration
-after upgrading.
-
-## Upgrading from 1.1.x
-
-Version 1.2.0 adds Citybus and New Lantao Bus, changes the editor to route-first
-operator discovery, and removes the manually entered direction-level stop
-name. Existing KMB and Green Minibus route records continue to work; reopen the
-editor when adding or replacing routes so their selected stop names are saved
-directly on each route.
-
-## Upgrading to 1.3.0
-
-Version 1.3.0 shortens the KMB label to `九巴`, automatically combines matching
-KMB + Citybus joint routes, displays each route's real destination instead of
-the direction-button name, and lets Sections views calculate the card height
-from its content.
-
-Existing separately saved KMB and Citybus records continue to work. To use the
-new single-row joint-route behaviour, remove those old route records in the
-editor and search/add the joint route again. In an existing Sections dashboard,
-use **Reset size** once if the old fixed row height was saved in the view.
+- **顯示 Custom element doesn't exist**：檢查 Resource 路徑，然後清除
+  瀏覽器快取並重新載入。
+- **仍然載入舊 Card**：增加 Resource URL 後面嘅版本號，例如
+  `/local/community/hk-ha-bus-card/hk-ha-bus-card.js?v=1.3.2`。
+- **Sections View 入面 Card 被裁切**：進入 Dashboard 編輯模式，開啟 Card
+  選單並選擇 **Reset size**。如果 YAML 內有已儲存嘅
+  `grid_options.rows`，請移除 `rows`。
+- **某部裝置無法查詢 ETA**：檢查瀏覽器、DNS 或網絡有冇封鎖
+  `data.etabus.gov.hk`、`data.etagmb.gov.hk` 或 `rt.data.gov.hk`。
+- **冇方向按鈕**：開啟 Card Editor 加入方向及路線；本項目刻意唔提供
+  預設方向。

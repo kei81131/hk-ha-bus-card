@@ -1,4 +1,4 @@
-const HK_HA_BUS_CARD_VERSION = "1.3.0";
+const HK_HA_BUS_CARD_VERSION = "1.3.1";
 const KMB_API = "https://data.etabus.gov.hk/v1/transport/kmb";
 const GMB_API = "https://data.etagmb.gov.hk";
 const CTB_API = "https://rt.data.gov.hk/v2/transport/citybus";
@@ -997,6 +997,19 @@ function stripDiscoveryFields(variant = {}) {
   return clean;
 }
 
+function logicalOperatorCodes(variants = []) {
+  const codes = [...new Set(variants.map((variant) => variant.operator))];
+  if (!codes.includes("joint")) return codes;
+  return codes.filter((code) => !["kmb", "ctb"].includes(code));
+}
+
+function variantBelongsToOperator(variant, operator, variants = []) {
+  if (variant.operator === operator) return true;
+  return operator === "joint" &&
+    variants.some((item) => item.operator === "joint") &&
+    ["kmb", "ctb"].includes(variant.operator);
+}
+
 async function searchKmbVariants(routeCode) {
   const candidates = ["outbound", "inbound"].flatMap((direction) =>
     ["1", "2", "3"].map((serviceType) => ({direction, serviceType}))
@@ -1190,11 +1203,15 @@ class HkHaBusCardEditor extends HTMLElement {
       draft.variants = await searchAllRouteVariants(routeCode);
       if (!draft.variants.length) throw new Error("所有營辦商均找不到此路線");
 
-      const operators = [...new Set(draft.variants.map((variant) => variant.operator))];
+      const operators = logicalOperatorCodes(draft.variants);
       if (operators.length === 1) {
         draft.operatorFilter = operators[0];
         draft.variantIndex = String(draft.variants.findIndex(
-          (variant) => variant.operator === draft.operatorFilter
+          (variant) => variantBelongsToOperator(
+            variant,
+            draft.operatorFilter,
+            draft.variants
+          )
         ));
         await this._loadStops(index, false);
       }
@@ -1377,15 +1394,22 @@ class HkHaBusCardEditor extends HTMLElement {
 
   _renderDirection(direction, index) {
     const draft = this._draft(index);
-    const operatorCodes = [...new Set(draft.variants.map((variant) => variant.operator))];
+    const operatorCodes = logicalOperatorCodes(draft.variants);
     const operators = operatorCodes.map((operator) =>
       `<option value="${operator}" ${operator === draft.operatorFilter ? "selected" : ""}>${escapeHtml(operatorInfo(operator).label)}</option>`
     ).join("");
     const variants = draft.variants.map((variant, variantIndex) => ({variant, variantIndex}))
-      .filter(({variant}) => variant.operator === draft.operatorFilter)
-      .map(({variant, variantIndex}) =>
-        `<option value="${variantIndex}" ${String(variantIndex) === String(draft.variantIndex) ? "selected" : ""}>${escapeHtml(variant.label)}</option>`
-      ).join("");
+      .filter(({variant}) => variantBelongsToOperator(
+        variant,
+        draft.operatorFilter,
+        draft.variants
+      ))
+      .map(({variant, variantIndex}) => {
+        const sourceSuffix = draft.operatorFilter === "joint" && variant.operator !== "joint"
+          ? ` · ${operatorInfo(variant.operator).label}特別班次`
+          : "";
+        return `<option value="${variantIndex}" ${String(variantIndex) === String(draft.variantIndex) ? "selected" : ""}>${escapeHtml(`${variant.label}${sourceSuffix}`)}</option>`;
+      }).join("");
     const stops = draft.stops.map((stop, stopIndex) =>
       `<option value="${stopIndex}" ${String(stopIndex) === String(draft.stopIndex) ? "selected" : ""}>${escapeHtml(stop.label)}</option>`
     ).join("");
@@ -1487,7 +1511,11 @@ class HkHaBusCardEditor extends HTMLElement {
         draft.stops = [];
         draft.stopIndex = "";
         draft.variantIndex = select.value
-          ? String(draft.variants.findIndex((variant) => variant.operator === select.value))
+          ? String(draft.variants.findIndex((variant) => variantBelongsToOperator(
+              variant,
+              select.value,
+              draft.variants
+            )))
           : "";
         if (draft.variantIndex) await this._loadStops(index);
         else this._render();
