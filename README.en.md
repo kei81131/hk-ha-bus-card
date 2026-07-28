@@ -21,6 +21,8 @@ Citybus, Green Minibus, and New Lantao Bus services.
 - List selected routes in each direction button's secondary text, sorted naturally by route number
 - Hide official stop codes appended to stop names while preserving the complete actual stop name
 - Use a solid theme colour for the selected direction button to provide clear contrast
+- Stop an active query immediately with the **停止更新** button on the left of the status row
+- Return the selected direction button to its unselected state after a manual stop or session expiry
 
 ## Install with HACS
 
@@ -49,7 +51,7 @@ Citybus, Green Minibus, and New Lantao Bus services.
 2. Go to **Settings > Dashboards > Resources** and add this JavaScript module:
 
    ```text
-   /local/community/hk-ha-bus-card/hk-ha-bus-card.js?v=1.3.3
+   /local/community/hk-ha-bus-card/hk-ha-bus-card.js?v=1.3.4
    ```
 
 3. Clear the browser cache and reload. If the Home Assistant Companion App
@@ -131,6 +133,8 @@ same custom `session_key`; use different keys to keep them independent.
   the configured interval.
 - Pressing the same button again or changing direction cancels the previous
   request and restarts the session timer.
+- Pressing **停止更新** on the left of the status row immediately cancels the
+  current request and prevents further updates.
 - Query state is kept by a page-global owner and synchronized to
   `sessionStorage`, allowing the same browser tab to recover after switching
   views or reloading Home Assistant.
@@ -147,7 +151,7 @@ closed, keep the query scheduler in Home Assistant or Node-RED.
   browser cache and reload.
 - **The old card is still loaded**: increase the version number at the end of
   the resource URL, for example
-  `/local/community/hk-ha-bus-card/hk-ha-bus-card.js?v=1.3.4`.
+  `/local/community/hk-ha-bus-card/hk-ha-bus-card.js?v=1.3.5`.
 - **Cards on different pages show the same query result**: upgrade to 1.3.2 or later and
   set `session_key` to `auto`. The legacy default `hk_ha_bus_card` is also
   treated as `auto` automatically.
