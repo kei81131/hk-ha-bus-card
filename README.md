@@ -1,7 +1,7 @@
 # HK HA Bus Card
 
-A frontend-only Home Assistant custom card for Hong Kong KMB/Long Win,
-Citybus, Green Minibus, and New Lantao Bus arrival times. It queries the public
+A frontend-only Home Assistant custom card for Hong Kong KMB, Citybus, Green
+Minibus, and New Lantao Bus arrival times. It queries the public
 transport APIs directly from the browser, so it does not require Node-RED,
 helper entities, scenes, automations, or `card-mod`.
 
@@ -10,7 +10,8 @@ helper entities, scenes, automations, or `card-mod`.
 ## Features
 
 - Route-first GUI search across all supported operators
-- Operator, service direction, and stop selection from live route data
+- Operator, actual route direction, and stop selection from live route data
+- Automatic KMB + Citybus joint-route discovery and merged ETA results
 - Every displayed stop name comes from the selected route stop
 - No ETA request until a direction button is pressed
 - Automatic refresh while a 15-minute browser session is active
@@ -19,6 +20,7 @@ helper entities, scenes, automations, or `card-mod`.
 - Routes sorted by the earliest usable ETA
 - Linear timeline with collision lanes for arrivals close together
 - Operator route colours, urgent-arrival highlighting, and dark mode support
+- Automatic content height in Home Assistant Sections views
 - No built-in directions or personal stop IDs
 
 ## Install with HACS
@@ -47,7 +49,7 @@ helper entities, scenes, automations, or `card-mod`.
 2. In **Settings > Dashboards > Resources**, add a JavaScript module resource:
 
    ```text
-   /local/community/hk-ha-bus-card/hk-ha-bus-card.js?v=1.2.0
+   /local/community/hk-ha-bus-card/hk-ha-bus-card.js?v=1.3.0
    ```
 
 3. Reload the browser without cache. In the Home Assistant Companion App,
@@ -79,14 +81,19 @@ For each direction:
 
 1. Enter the direction button name.
 2. Enter a route number and select **搜尋營辦商**.
-3. Select one of the matched operators: KMB/Long Win, Citybus, Green Minibus,
-   or New Lantao Bus.
-4. Select the service direction and bus stop.
+3. If more than one unrelated operator matches, select KMB, Citybus, Green
+   Minibus, or New Lantao Bus. KMB + Citybus joint routes such as 117 are
+   combined automatically, so there is no separate operator choice.
+4. Select the route's actual service direction and bus stop.
 5. Select **加入這條路線**.
 
 The card stores the name returned by the selected route-stop record. There is
 no manually entered shared stop name, and different routes in one direction
 may use different stops.
+
+The direction name configured at the top is only used on the query button.
+Every result row shows the actual destination returned by that route's live
+route record.
 
 The editor only calls route and stop discovery endpoints. It does not start ETA
 polling; normal ETA requests still require pressing a direction button on the
@@ -129,7 +136,11 @@ is closed, keep the query scheduler in Home Assistant or Node-RED instead.
 - **Custom element doesn't exist**: check the resource path and reload without
   cache.
 - **Old card remains loaded**: increment the resource query suffix, for example
-  `/local/community/hk-ha-bus-card/hk-ha-bus-card.js?v=1.2.1`.
+  `/local/community/hk-ha-bus-card/hk-ha-bus-card.js?v=1.3.1`.
+- **Card is clipped in a Sections view after upgrading**: open the card menu
+  while editing the dashboard and select **Reset size**. If YAML mode contains
+  a saved `grid_options.rows`, remove that `rows` value. Version 1.3.0 leaves
+  the row count automatic so the card grows with the displayed routes.
 - **One device cannot query ETA**: check whether its browser, DNS, or network
   blocks `data.etabus.gov.hk`, `data.etagmb.gov.hk`, or `rt.data.gov.hk`.
 - **No direction buttons appear**: open the Card Editor and configure routes;
@@ -138,7 +149,7 @@ is closed, keep the query scheduler in Home Assistant or Node-RED instead.
 ## Upgrading from `custom:spk-bus-card`
 
 Replace the old resource with
-`/local/community/hk-ha-bus-card/hk-ha-bus-card.js?v=1.2.0`, then change the
+`/local/community/hk-ha-bus-card/hk-ha-bus-card.js?v=1.3.0`, then change the
 card type to:
 
 ```yaml
@@ -156,3 +167,15 @@ operator discovery, and removes the manually entered direction-level stop
 name. Existing KMB and Green Minibus route records continue to work; reopen the
 editor when adding or replacing routes so their selected stop names are saved
 directly on each route.
+
+## Upgrading to 1.3.0
+
+Version 1.3.0 shortens the KMB label to `九巴`, automatically combines matching
+KMB + Citybus joint routes, displays each route's real destination instead of
+the direction-button name, and lets Sections views calculate the card height
+from its content.
+
+Existing separately saved KMB and Citybus records continue to work. To use the
+new single-row joint-route behaviour, remove those old route records in the
+editor and search/add the joint route again. In an existing Sections dashboard,
+use **Reset size** once if the old fixed row height was saved in the view.

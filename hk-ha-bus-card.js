@@ -1,12 +1,13 @@
-const HK_HA_BUS_CARD_VERSION = "1.2.0";
+const HK_HA_BUS_CARD_VERSION = "1.3.0";
 const KMB_API = "https://data.etabus.gov.hk/v1/transport/kmb";
 const GMB_API = "https://data.etagmb.gov.hk";
 const CTB_API = "https://rt.data.gov.hk/v2/transport/citybus";
 const NLB_API = "https://rt.data.gov.hk/v2/transport/nlb";
 
 const OPERATOR_INFO = {
-  kmb: {label: "九巴／龍運", className: "kmb"},
+  kmb: {label: "九巴", className: "kmb"},
   ctb: {label: "城巴", className: "ctb"},
+  joint: {label: "九巴＋城巴", className: "joint"},
   gmb: {label: "專線小巴", className: "gmb"},
   nlb: {label: "嶼巴", className: "nlb"}
 };
@@ -47,6 +48,24 @@ const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => 
   "'": "&#039;"
 })[char]);
 
+function normalizeRouteConfig(route = {}) {
+  return {
+    ...route,
+    operator: String(route.operator || "kmb").toLowerCase(),
+    route: String(route.route || "").toUpperCase(),
+    co: route.co == null ? undefined : String(route.co),
+    direction: route.direction == null ? undefined : String(route.direction),
+    bound: route.bound == null ? undefined : String(route.bound),
+    service_type: route.service_type == null ? "1" : String(route.service_type),
+    route_id: route.route_id == null ? undefined : Number(route.route_id),
+    route_seq: route.route_seq == null ? undefined : Number(route.route_seq),
+    stop_seq: route.stop_seq == null ? undefined : Number(route.stop_seq),
+    sources: Array.isArray(route.sources)
+      ? route.sources.map((source) => normalizeRouteConfig(source))
+      : undefined
+  };
+}
+
 function normalizeConfig(config = {}) {
   const merged = {
     ...clone(DEFAULT_CONFIG),
@@ -67,18 +86,7 @@ function normalizeConfig(config = {}) {
     id: String(direction.id || `direction_${index + 1}`),
     name: String(direction.name || `方向 ${index + 1}`),
     routes: Array.isArray(direction.routes)
-      ? direction.routes.map((route) => ({
-          ...route,
-          operator: String(route.operator || "kmb").toLowerCase(),
-          route: String(route.route || "").toUpperCase(),
-          co: route.co == null ? undefined : String(route.co),
-          direction: route.direction == null ? undefined : String(route.direction),
-          bound: route.bound == null ? undefined : String(route.bound),
-          service_type: route.service_type == null ? "1" : String(route.service_type),
-          route_id: route.route_id == null ? undefined : Number(route.route_id),
-          route_seq: route.route_seq == null ? undefined : Number(route.route_seq),
-          stop_seq: route.stop_seq == null ? undefined : Number(route.stop_seq)
-        }))
+      ? direction.routes.map((route) => normalizeRouteConfig(route))
       : []
   }));
 
@@ -182,15 +190,16 @@ class HkHaBusCard extends HTMLElement {
   }
 
   getCardSize() {
-    return Math.max(3, Math.min(9, 2 + Number(this._config.max_routes || 3) * 2));
+    const routeCount = this._status === "loading"
+      ? Math.min(3, Math.max(1, this._activeDirection?.routes?.length || 1))
+      : Math.max(1, this._displayRoutes().length || Number(this._config.max_routes || 3));
+    return 3 + routeCount * 3;
   }
 
   getGridOptions() {
     return {
       columns: "full",
-      min_columns: 6,
-      rows: 6,
-      min_rows: 2
+      min_columns: 6
     };
   }
 
@@ -394,8 +403,11 @@ class HkHaBusCard extends HTMLElement {
       };
     });
 
-    this._errorCount = this._routeResults.filter((route) => route.status === "error").length;
-    this._status = this._errorCount === this._routeResults.length
+    const fatalErrorCount = this._routeResults.filter((route) => route.status === "error").length;
+    this._errorCount = this._routeResults.filter(
+      (route) => route.status === "error" || route.partial_error
+    ).length;
+    this._status = fatalErrorCount === this._routeResults.length
       ? "error"
       : (this._errorCount > 0 ? "degraded" : "active");
     this._updatedAt = Date.now();
@@ -412,6 +424,44 @@ class HkHaBusCard extends HTMLElement {
   }
 
   async _fetchRoute(route, signal) {
+    if (route.operator === "joint") {
+      const sources = Array.isArray(route.sources) ? route.sources : [];
+      if (!sources.length) throw new Error(`聯營線 ${route.route}: 缺少營辦商資料`);
+
+      const settled = await Promise.allSettled(
+        sources.map((source) => this._fetchRoute(source, signal))
+      );
+      const fulfilled = settled.filter((result) => result.status === "fulfilled");
+      const rejected = settled.filter((result) => result.status === "rejected");
+      if (!fulfilled.length) {
+        const detail = rejected
+          .map((result) => String(result.reason?.message || result.reason || "查詢失敗"))
+          .join("；");
+        throw new Error(detail || `聯營線 ${route.route} 查詢失敗`);
+      }
+
+      const arrivals = fulfilled.flatMap((result) => {
+        const sourceResult = result.value;
+        const sourceLabel = operatorInfo(sourceResult.operator).label;
+        return (sourceResult.arrivals || []).map((arrival) => ({
+          ...arrival,
+          remark: [sourceLabel, arrival.remark].filter(Boolean).join(" · ")
+        }));
+      });
+      return {
+        route: route.route,
+        operator: "joint",
+        stop_name: route.stop_name || "",
+        destination: route.destination || fulfilled[0]?.value?.destination || "",
+        status: arrivals.length ? "ok" : "no_service",
+        partial_error: rejected.length > 0,
+        error_message: rejected
+          .map((result) => String(result.reason?.message || result.reason || "查詢失敗"))
+          .join("；"),
+        arrivals
+      };
+    }
+
     if (route.operator === "ctb") {
       if (!route.stop_id || !route.route) {
         throw new Error(`城巴 ${route.route}: 缺少 stop_id`);
@@ -671,7 +721,7 @@ class HkHaBusCard extends HTMLElement {
             <div class="route-badge ${operator.className}">${escapeHtml(route.route)}</div>
             <div class="operator">${escapeHtml(operator.label)}</div>
           </div>
-          <div class="direction"><span>➜</span>${escapeHtml(this._activeDirection?.name || "")}</div>
+          <div class="direction"><span>➜</span>${escapeHtml(route.destination || "未提供目的地")}</div>
           <div class="stop">📍 ${escapeHtml(this._routeStopName(route))}</div>
         </div>
         <div class="timeline" style="min-height:${57 + maxLane * laneHeight}px">
@@ -749,6 +799,7 @@ class HkHaBusCard extends HTMLElement {
         .route-badge { min-width:48px; box-sizing:border-box; padding:7px 9px; border-radius:7px; color:#fff; text-align:center; font-size:20px; font-weight:800; line-height:1; }
         .route-badge.kmb { background:#cf2027; }
         .route-badge.ctb { color:#102a43; background:#f4c400; }
+        .route-badge.joint { color:#102a43; background:linear-gradient(90deg,#cf2027 0 48%,#f4c400 52% 100%); text-shadow:0 1px 0 rgba(255,255,255,.45); }
         .route-badge.gmb { background:#168f48; }
         .route-badge.nlb { background:#1473b9; }
         .route-badge.other { background:#667085; }
@@ -850,6 +901,100 @@ function splitRouteName(name) {
     origin: parts.shift()?.trim() || "",
     destination: parts.join(" > ").trim()
   };
+}
+
+function normalizePlaceName(value) {
+  return String(value || "")
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/[（）()［］\[\]，,。．.\-–—'"·]/g, "")
+    .replace(/巴士總站|公共運輸交匯處|總站|巴士站/g, "")
+    .replace(/\s+/g, "");
+}
+
+function combineJointVariants(variants) {
+  const jointGroups = new Map();
+  variants.forEach((variant, index) => {
+    if (!['kmb', 'ctb'].includes(variant.operator)) return;
+    const key = `${normalizePlaceName(variant.origin)}|${normalizePlaceName(variant.destination)}`;
+    if (!jointGroups.has(key)) jointGroups.set(key, []);
+    jointGroups.get(key).push({variant, index});
+  });
+
+  const jointByIndex = new Map();
+  const consumed = new Set();
+  jointGroups.forEach((members) => {
+    const operators = new Set(members.map(({variant}) => variant.operator));
+    if (!operators.has("kmb") || !operators.has("ctb")) return;
+    const first = members[0].variant;
+    const firstIndex = Math.min(...members.map(({index}) => index));
+    jointByIndex.set(firstIndex, {
+      operator: "joint",
+      route: first.route,
+      origin: first.origin,
+      destination: first.destination,
+      sources: members.map(({variant}) => variant),
+      label: `${first.origin} ➜ ${first.destination} · 九巴＋城巴聯營`
+    });
+    members.forEach(({index}) => consumed.add(index));
+  });
+
+  return variants.flatMap((variant, index) => {
+    if (jointByIndex.has(index)) return [jointByIndex.get(index)];
+    if (consumed.has(index)) return [];
+    return [variant];
+  });
+}
+
+function stopDistanceMetres(first, second) {
+  const lat1 = Number(first?.lat);
+  const lon1 = Number(first?.long);
+  const lat2 = Number(second?.lat);
+  const lon2 = Number(second?.long);
+  if (![lat1, lon1, lat2, lon2].every(Number.isFinite)) return Number.POSITIVE_INFINITY;
+  const radians = (degrees) => degrees * Math.PI / 180;
+  const dLat = radians(lat2 - lat1);
+  const dLon = radians(lon2 - lon1);
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos(radians(lat1)) * Math.cos(radians(lat2)) * Math.sin(dLon / 2) ** 2;
+  return 6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function mergeJointStops(stopLists) {
+  const clusters = [];
+  stopLists.forEach((stops, sourceIndex) => {
+    (stops || []).forEach((stop) => {
+      const normalizedName = normalizePlaceName(stop.name);
+      const candidates = clusters.filter((cluster) =>
+        !cluster.source_stops.some((item) => item.source_index === sourceIndex)
+      );
+      let cluster = candidates.find((candidate) =>
+        normalizedName && normalizePlaceName(candidate.name) === normalizedName
+      );
+      if (!cluster) {
+        cluster = candidates
+          .map((candidate) => ({candidate, distance: stopDistanceMetres(candidate, stop)}))
+          .filter(({distance}) => distance <= 220)
+          .sort((a, b) => a.distance - b.distance)[0]?.candidate;
+      }
+      const sourceStop = {...stop, source_index: sourceIndex};
+      if (cluster) {
+        cluster.source_stops.push(sourceStop);
+      } else {
+        clusters.push({...stop, source_stops: [sourceStop]});
+      }
+    });
+  });
+
+  return clusters.map((cluster, index) => ({
+    ...cluster,
+    label: `${index + 1}. ${cluster.name}`
+  }));
+}
+
+function stripDiscoveryFields(variant = {}) {
+  const {label, _route_stops, sources, ...clean} = variant;
+  return clean;
 }
 
 async function searchKmbVariants(routeCode) {
@@ -958,13 +1103,13 @@ async function searchAllRouteVariants(routeCode) {
     ]).finally(() => clearTimeout(timer));
   };
   const searches = await Promise.allSettled([
-    withTimeout(searchKmbVariants(routeCode), "九巴／龍運"),
+    withTimeout(searchKmbVariants(routeCode), "九巴"),
     withTimeout(searchCitybusVariants(routeCode), "城巴"),
     withTimeout(searchGmbVariants(routeCode), "專線小巴"),
     withTimeout(searchNlbVariants(routeCode), "嶼巴")
   ]);
   const seen = new Set();
-  return searches
+  const variants = searches
     .filter((result) => result.status === "fulfilled")
     .flatMap((result) => result.value)
     .filter((variant) => {
@@ -982,6 +1127,7 @@ async function searchAllRouteVariants(routeCode) {
       seen.add(key);
       return true;
     });
+  return combineJointVariants(variants);
 }
 
 class HkHaBusCardEditor extends HTMLElement {
@@ -1071,68 +1217,13 @@ class HkHaBusCardEditor extends HTMLElement {
     if (rerender) this._render();
 
     try {
-      if (variant.operator === "kmb") {
-        const directionPath = variant.bound === "O" ? "outbound" : "inbound";
-        const [routeStopsPayload, stopMap] = await Promise.all([
-          fetchJson(`${KMB_API}/route-stop/${variant.route}/${directionPath}/${variant.service_type}`, {fresh: false}),
-          getKmbStops()
-        ]);
-        const routeStops = Array.isArray(routeStopsPayload?.data) ? routeStopsPayload.data : [];
-        draft.stops = routeStops.map((routeStop) => {
-          const stop = stopMap.get(String(routeStop.stop)) || {};
-          return {
-            stop_id: String(routeStop.stop),
-            stop_seq: Number(routeStop.seq),
-            name: stop.name_tc || routeStop.stop,
-            lat: stop.lat,
-            long: stop.long,
-            label: `${routeStop.seq}. ${stop.name_tc || routeStop.stop}`
-          };
-        });
-      } else if (variant.operator === "ctb") {
-        const routeStops = Array.isArray(variant._route_stops)
-          ? variant._route_stops
-          : (await fetchJson(
-              `${CTB_API}/route-stop/${variant.co || "CTB"}/${variant.route}/${variant.direction}`,
-              {fresh: false}
-            ))?.data;
-        draft.stops = await mapWithConcurrency(
-          Array.isArray(routeStops) ? routeStops : [],
-          8,
-          async (routeStop) => {
-            const stop = await getCitybusStop(routeStop.stop).catch(() => ({}));
-            return {
-              stop_id: String(routeStop.stop),
-              stop_seq: Number(routeStop.seq),
-              name: stop.name_tc || routeStop.stop,
-              lat: stop.lat,
-              long: stop.long,
-              label: `${routeStop.seq}. ${stop.name_tc || routeStop.stop}`
-            };
-          }
+      if (variant.operator === "joint") {
+        const stopLists = await Promise.all(
+          (variant.sources || []).map((source) => this._fetchVariantStops(source))
         );
-      } else if (variant.operator === "gmb") {
-        const payload = await fetchJson(`${GMB_API}/route-stop/${variant.route_id}/${variant.route_seq}`, {fresh: false});
-        const routeStops = payload?.data?.route_stops;
-        draft.stops = (Array.isArray(routeStops) ? routeStops : []).map((stop) => ({
-          stop_id: Number(stop.stop_id),
-          stop_seq: Number(stop.stop_seq),
-          name: stop.name_tc,
-          label: `${stop.stop_seq}. ${stop.name_tc}`
-        }));
-      } else if (variant.operator === "nlb") {
-        const payload = await fetchJson(
-          `${NLB_API}/stop.php?action=list&routeId=${encodeURIComponent(variant.route_id)}`,
-          {fresh: false}
-        );
-        draft.stops = (Array.isArray(payload?.stops) ? payload.stops : []).map((stop, stopIndex) => ({
-          stop_id: String(stop.stopId),
-          stop_seq: stopIndex + 1,
-          name: stop.stopName_c || stop.stopName_e || stop.stopId,
-          lat: stop.latitude,
-          long: stop.longitude,
-          label: `${stopIndex + 1}. ${stop.stopName_c || stop.stopName_e || stop.stopId}`
-        }));
+        draft.stops = mergeJointStops(stopLists);
+      } else {
+        draft.stops = await this._fetchVariantStops(variant);
       }
       if (!draft.stops.length) throw new Error("找不到巴士站");
       draft.stopIndex = "0";
@@ -1142,6 +1233,80 @@ class HkHaBusCardEditor extends HTMLElement {
       draft.loading = false;
       if (rerender) this._render();
     }
+  }
+
+  async _fetchVariantStops(variant) {
+    if (variant.operator === "kmb") {
+      const directionPath = variant.bound === "O" ? "outbound" : "inbound";
+      const [routeStopsPayload, stopMap] = await Promise.all([
+        fetchJson(`${KMB_API}/route-stop/${variant.route}/${directionPath}/${variant.service_type}`, {fresh: false}),
+        getKmbStops()
+      ]);
+      const routeStops = Array.isArray(routeStopsPayload?.data) ? routeStopsPayload.data : [];
+      return routeStops.map((routeStop) => {
+        const stop = stopMap.get(String(routeStop.stop)) || {};
+        return {
+          stop_id: String(routeStop.stop),
+          stop_seq: Number(routeStop.seq),
+          name: stop.name_tc || routeStop.stop,
+          lat: stop.lat,
+          long: stop.long,
+          label: `${routeStop.seq}. ${stop.name_tc || routeStop.stop}`
+        };
+      });
+    }
+
+    if (variant.operator === "ctb") {
+      const routeStops = Array.isArray(variant._route_stops)
+        ? variant._route_stops
+        : (await fetchJson(
+            `${CTB_API}/route-stop/${variant.co || "CTB"}/${variant.route}/${variant.direction}`,
+            {fresh: false}
+          ))?.data;
+      return mapWithConcurrency(
+        Array.isArray(routeStops) ? routeStops : [],
+        8,
+        async (routeStop) => {
+          const stop = await getCitybusStop(routeStop.stop).catch(() => ({}));
+          return {
+            stop_id: String(routeStop.stop),
+            stop_seq: Number(routeStop.seq),
+            name: stop.name_tc || routeStop.stop,
+            lat: stop.lat,
+            long: stop.long,
+            label: `${routeStop.seq}. ${stop.name_tc || routeStop.stop}`
+          };
+        }
+      );
+    }
+
+    if (variant.operator === "gmb") {
+      const payload = await fetchJson(`${GMB_API}/route-stop/${variant.route_id}/${variant.route_seq}`, {fresh: false});
+      const routeStops = payload?.data?.route_stops;
+      return (Array.isArray(routeStops) ? routeStops : []).map((stop) => ({
+        stop_id: Number(stop.stop_id),
+        stop_seq: Number(stop.stop_seq),
+        name: stop.name_tc,
+        label: `${stop.stop_seq}. ${stop.name_tc}`
+      }));
+    }
+
+    if (variant.operator === "nlb") {
+      const payload = await fetchJson(
+        `${NLB_API}/stop.php?action=list&routeId=${encodeURIComponent(variant.route_id)}`,
+        {fresh: false}
+      );
+      return (Array.isArray(payload?.stops) ? payload.stops : []).map((stop, stopIndex) => ({
+        stop_id: String(stop.stopId),
+        stop_seq: stopIndex + 1,
+        name: stop.stopName_c || stop.stopName_e || stop.stopId,
+        lat: stop.latitude,
+        long: stop.longitude,
+        label: `${stopIndex + 1}. ${stop.stopName_c || stop.stopName_e || stop.stopId}`
+      }));
+    }
+
+    return [];
   }
 
   _addRoute(index) {
@@ -1154,13 +1319,40 @@ class HkHaBusCardEditor extends HTMLElement {
       return;
     }
 
-    const {label, _route_stops, ...routeVariant} = variant;
-    const route = {
-      ...routeVariant,
-      stop_id: stop.stop_id,
-      stop_seq: stop.stop_seq,
-      stop_name: stop.name
-    };
+    let route;
+    if (variant.operator === "joint") {
+      const sourceStops = Array.isArray(stop.source_stops) ? stop.source_stops : [];
+      const sources = (variant.sources || []).map((source, sourceIndex) => {
+        const sourceStop = sourceStops.find((item) => item.source_index === sourceIndex);
+        if (!sourceStop) return null;
+        return {
+          ...stripDiscoveryFields(source),
+          stop_id: sourceStop.stop_id,
+          stop_seq: sourceStop.stop_seq,
+          stop_name: sourceStop.name
+        };
+      }).filter(Boolean);
+      if (!sources.length) {
+        draft.error = "所選巴士站沒有可用的聯營資料";
+        this._render();
+        return;
+      }
+      route = {
+        operator: "joint",
+        route: variant.route,
+        origin: variant.origin,
+        destination: variant.destination,
+        stop_name: stop.name,
+        sources
+      };
+    } else {
+      route = {
+        ...stripDiscoveryFields(variant),
+        stop_id: stop.stop_id,
+        stop_seq: stop.stop_seq,
+        stop_name: stop.name
+      };
+    }
 
     this._config.directions[index].routes.push(route);
     this._drafts.set(index, {
@@ -1211,7 +1403,8 @@ class HkHaBusCardEditor extends HTMLElement {
           <label>路線<input data-draft-field="route" data-draft-index="${index}" value="${escapeHtml(draft.route)}" placeholder="例如 1A"></label>
           <button class="primary" data-load-route="${index}" ${draft.loading ? "disabled" : ""}>${draft.loading ? "搜尋中…" : "搜尋營辦商"}</button>
         </div>
-        ${draft.variants.length ? `<label>營辦商（搜尋結果）<select data-operator-filter="${index}"><option value="">請選擇營辦商</option>${operators}</select></label>` : ""}
+        ${operatorCodes.length > 1 ? `<label>營辦商（搜尋結果）<select data-operator-filter="${index}"><option value="">請選擇營辦商</option>${operators}</select></label>` : ""}
+        ${operatorCodes.length === 1 ? `<div class="operator-result">營辦商：${escapeHtml(operatorInfo(operatorCodes[0]).label)}${operatorCodes[0] === "joint" ? "（聯營）" : ""}</div>` : ""}
         ${draft.operatorFilter && variants ? `<label>路線方向<select data-variant-index="${index}">${variants}</select></label>` : ""}
         ${draft.stops.length ? `<label>巴士站<select data-stop-index="${index}">${stops}</select></label>` : ""}
         ${draft.stops.length ? `<button class="add" data-add-route="${index}">加入這條路線</button>` : ""}
@@ -1237,7 +1430,7 @@ class HkHaBusCardEditor extends HTMLElement {
         .grid{display:grid;gap:10px}.grid.two{grid-template-columns:repeat(2,minmax(0,1fr))}.picker-grid{grid-template-columns:minmax(0,1fr) auto;align-items:end}
         .direction-editor{padding:14px;border:1px solid var(--divider-color);border-radius:14px}.section-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}.section-head strong{font-size:15px}
         .saved-routes{display:flex;flex-direction:column;gap:6px;margin:12px 0}.saved-route{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;background:color-mix(in srgb,var(--primary-text-color) 5%,transparent);font-size:12px}.saved-route span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.empty{padding:8px;color:var(--secondary-text-color);font-size:12px}
-        .route-picker{display:flex;flex-direction:column;gap:10px;padding:12px;border-radius:10px;background:color-mix(in srgb,var(--primary-text-color) 4%,transparent)}.picker-title{font-size:13px;font-weight:700}.error{color:var(--error-color,#db4437);font-size:12px}.add-direction{align-self:flex-start}.hint{color:var(--secondary-text-color);font-size:11px;line-height:1.45}
+        .route-picker{display:flex;flex-direction:column;gap:10px;padding:12px;border-radius:10px;background:color-mix(in srgb,var(--primary-text-color) 4%,transparent)}.picker-title{font-size:13px;font-weight:700}.operator-result{padding:8px 10px;border-radius:8px;color:var(--secondary-text-color);background:color-mix(in srgb,var(--primary-color) 8%,transparent);font-size:12px}.error{color:var(--error-color,#db4437);font-size:12px}.add-direction{align-self:flex-start}.hint{color:var(--secondary-text-color);font-size:11px;line-height:1.45}
         @media(max-width:650px){.grid.two,.picker-grid{grid-template-columns:1fr 1fr}.picker-grid button{min-height:40px}} @media(max-width:400px){.grid.two,.picker-grid{grid-template-columns:1fr}}
       </style>
       <div class="editor">
@@ -1252,7 +1445,7 @@ class HkHaBusCardEditor extends HTMLElement {
         </div>
         ${directionEditors}
         <button class="add-direction" data-add-direction>新增方向</button>
-        <div class="hint">支援九巴／龍運、城巴、專線小巴及嶼巴。顯示站名會直接使用每條路線所選巴士站；ETA 仍然只會在 Dashboard 按方向掣後查詢。</div>
+        <div class="hint">支援九巴、城巴、專線小巴及嶼巴；九巴與城巴聯營路線會自動合併。顯示站名會直接使用每條路線所選巴士站；ETA 仍然只會在 Dashboard 按方向掣後查詢。</div>
       </div>`;
 
     this.shadowRoot.querySelectorAll("[data-config-field]").forEach((input) => {
@@ -1385,7 +1578,7 @@ if (!window.customCards.some((card) => card.type === "hk-ha-bus-card")) {
     type: "hk-ha-bus-card",
     name: "HK HA Bus Card",
     preview: true,
-    description: "Frontend-only KMB/Long Win, Citybus, GMB and NLB arrival board",
+    description: "Frontend-only KMB, Citybus, GMB and NLB arrival board",
     documentationURL: "https://developers.home-assistant.io/docs/frontend/custom-ui/custom-card/"
   });
 }
