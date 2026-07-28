@@ -21,6 +21,8 @@ Home Assistant Custom Card 可以直接查詢香港九巴、城巴、嶼巴、�
 - 方向按鈕副標題會列出已選路線，並按路線號碼由小至大排列
 - Card 內會隱藏站名結尾嘅官方站碼，但保留完整實際站名
 - 已選方向按鈕使用實色主題色，與未選按鈕有清晰對比
+- 查詢進行期間可使用狀態列左邊嘅「停止更新」按鈕立即停止
+- 手動停止或 Session 過期後，已選方向按鈕會自動回復未選狀態
 
 ## 使用 HACS 安裝
 
@@ -47,7 +49,7 @@ Home Assistant Custom Card 可以直接查詢香港九巴、城巴、嶼巴、�
 2. 去 **Settings > Dashboards > Resources**，加入 JavaScript Module：
 
    ```text
-   /local/community/hk-ha-bus-card/hk-ha-bus-card.js?v=1.3.3
+   /local/community/hk-ha-bus-card/hk-ha-bus-card.js?v=1.3.4
    ```
 
 3. 清除瀏覽器快取並重新載入。Home Assistant Companion App 如仍然使用
@@ -120,6 +122,7 @@ Card 會儲存所選路線巴士站嘅官方名稱。唔需要手動輸入共用
 - 冇已儲存 Session 時，載入 Card 唔會發出任何 ETA 請求。
 - 撳方向按鈕後會立即查詢，之後按設定間隔更新。
 - 重複撳同一按鈕或轉換方向，會取消舊請求並重新計算 Session 時間。
+- 撳狀態列左邊嘅 **停止更新**，會立即取消現有請求及停止之後嘅更新。
 - 查詢狀態會保留喺頁面全域 Owner，並同步到 `sessionStorage`，所以同一個
   瀏覽器分頁切換 View 或重新載入 Home Assistant 後仍可恢復。
 - Session 過期後會停止更新，亦唔會自動重新啟動。
@@ -134,7 +137,7 @@ Card 會儲存所選路線巴士站嘅官方名稱。唔需要手動輸入共用
 - **顯示 Custom element doesn't exist**：檢查 Resource 路徑，然後清除
   瀏覽器快取並重新載入。
 - **仍然載入舊 Card**：增加 Resource URL 後面嘅版本號，例如
-  `/local/community/hk-ha-bus-card/hk-ha-bus-card.js?v=1.3.4`。
+  `/local/community/hk-ha-bus-card/hk-ha-bus-card.js?v=1.3.5`。
 - **不同頁面嘅 Card 顯示同一個查詢結果**：升級至 1.3.2 或以上，並將
   `session_key` 設成 `auto`。舊預設值 `hk_ha_bus_card` 亦會自動當成
   `auto` 處理。
