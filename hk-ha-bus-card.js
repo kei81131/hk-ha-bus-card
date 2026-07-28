@@ -1,4 +1,4 @@
-const HK_HA_BUS_CARD_VERSION = "1.3.3";
+const HK_HA_BUS_CARD_VERSION = "1.3.4";
 const KMB_API = "https://data.etabus.gov.hk/v1/transport/kmb";
 const GMB_API = "https://data.etagmb.gov.hk";
 const CTB_API = "https://rt.data.gov.hk/v2/transport/citybus";
@@ -391,13 +391,42 @@ class HkHaBusCard extends HTMLElement {
   _expireSession(sessionId) {
     if (sessionId !== this._sessionSerial) return;
     if (this._refreshTimer) clearTimeout(this._refreshTimer);
+    if (this._expiryTimer) clearTimeout(this._expiryTimer);
     if (this._clockTimer) clearInterval(this._clockTimer);
     this._refreshTimer = null;
+    this._expiryTimer = null;
     this._clockTimer = null;
     if (this._requestController) this._requestController.abort();
     this._requestController = null;
     this._status = "expired";
+    this._activeDirection = null;
     this._routeResults = [];
+    this._render();
+  }
+
+  _isSessionRunning() {
+    return Boolean(
+      this._activeDirection &&
+      this._expiresAt &&
+      Date.now() < this._expiresAt &&
+      ["loading", "active", "degraded", "error"].includes(this._status)
+    );
+  }
+
+  _stopSession() {
+    const entry = this._sessionEntry();
+    if (entry.owner && entry.owner !== this) {
+      entry.owner._stopSession();
+      return;
+    }
+    entry.owner = this;
+    this._invalidateSession();
+    this._status = "stopped";
+    this._activeDirection = null;
+    this._routeResults = [];
+    this._updatedAt = null;
+    this._expiresAt = null;
+    this._errorCount = 0;
     this._render();
   }
 
@@ -680,6 +709,7 @@ class HkHaBusCard extends HTMLElement {
     if (!this._config.directions.length) return "尚未設定方向及路線";
     if (this._status === "idle") return "按方向掣後才會查詢";
     if (this._status === "loading") return "正在查詢巴士到站時間…";
+    if (this._status === "stopped") return "已停止更新，請重新選擇方向";
     if (this._status === "expired") return "資料已過期，請重新選擇方向";
     if (this._status === "error") return "全部路線查詢失敗，系統稍後仍會重試";
 
@@ -788,6 +818,9 @@ class HkHaBusCard extends HTMLElement {
     if (this._status === "idle") {
       return this._message("🚌", "準備查詢", "撳上面其中一個方向按鈕先會查詢到站時間");
     }
+    if (this._status === "stopped") {
+      return this._message("⏹️", "已停止更新", "撳上面其中一個方向按鈕可以重新開始查詢");
+    }
     if (this._status === "expired") {
       return this._message("⏱️", "資料已過期", "為免顯示過時資料，請重新選擇方向");
     }
@@ -813,12 +846,17 @@ class HkHaBusCard extends HTMLElement {
     }
     const directions = this._config.directions || [];
     const buttons = directions.map((direction) => {
-      const active = this._activeDirection?.id === direction.id && this._status !== "idle";
+      const active = this._activeDirection?.id === direction.id &&
+        ["loading", "active", "degraded", "error"].includes(this._status);
       return `<button class="direction-button ${active ? "active" : ""}" data-direction="${escapeHtml(direction.id)}">
         <span class="button-icon">🚌</span>
         <span class="button-copy"><strong>${escapeHtml(direction.name)}</strong><small>${escapeHtml(this._directionSubtitle(direction))}</small></span>
       </button>`;
     }).join("");
+    const showStopButton = this._isSessionRunning();
+    const statusContent = showStopButton
+      ? `<button class="status-stop" data-stop-session>停止更新</button><span class="status-text">${escapeHtml(this._statusText())}</span><span class="status-spacer" aria-hidden="true">停止更新</span>`
+      : `<span class="status-text">${escapeHtml(this._statusText())}</span>`;
 
     this.shadowRoot.innerHTML = `
       <style>
@@ -836,6 +874,12 @@ class HkHaBusCard extends HTMLElement {
         .button-copy small { color:var(--secondary-text-color); font-size:11px; line-height:1.25; white-space:normal; overflow-wrap:anywhere; }
         .direction-button.active .button-copy small { color:color-mix(in srgb,var(--text-primary-color,#fff) 82%,transparent); }
         .status { padding:9px 16px; border-top:1px solid var(--divider-color); border-bottom:1px solid var(--divider-color); color:var(--secondary-text-color); background:color-mix(in srgb,var(--card-background-color) 94%,var(--primary-text-color)); font-size:11px; text-align:center; }
+        .status.has-stop { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:8px; padding:6px 10px; }
+        .status-text { min-width:0; line-height:1.35; }
+        .status-stop,.status-spacer { min-width:66px; box-sizing:border-box; padding:5px 7px; font:inherit; font-size:10px; font-weight:700; white-space:nowrap; }
+        .status-stop { appearance:none; border:1px solid var(--error-color,#db4437); border-radius:8px; color:var(--error-color,#db4437); background:transparent; cursor:pointer; transition:.15s ease; }
+        .status-stop:hover { color:#fff; background:var(--error-color,#db4437); }
+        .status-spacer { visibility:hidden; }
         .route-row { padding:15px 14px 18px; }
         .route-row + .route-row { border-top:1px solid var(--divider-color); }
         .route-head { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:10px; }
@@ -879,12 +923,15 @@ class HkHaBusCard extends HTMLElement {
           <div class="title">${escapeHtml(this._config.title)}</div>
           <div class="direction-buttons">${buttons || "未設定方向"}</div>
         </div>
-        <div class="status">${escapeHtml(this._statusText())}</div>
+        <div class="status ${showStopButton ? "has-stop" : ""}">${statusContent}</div>
         <div class="board">${this._renderBody()}</div>
       </ha-card>`;
 
     this.shadowRoot.querySelectorAll("[data-direction]").forEach((button) => {
       button.addEventListener("click", () => this._startDirection(button.dataset.direction));
+    });
+    this.shadowRoot.querySelector("[data-stop-session]")?.addEventListener("click", () => {
+      this._stopSession();
     });
   }
 }
