@@ -46,7 +46,7 @@ Citybus, Green Minibus, and New Lantao Bus services.
 2. Go to **Settings > Dashboards > Resources** and add this JavaScript module:
 
    ```text
-   /local/community/hk-ha-bus-card/hk-ha-bus-card.js?v=1.3.1
+   /local/community/hk-ha-bus-card/hk-ha-bus-card.js?v=1.3.2
    ```
 
 3. Clear the browser cache and reload. If the Home Assistant Companion App
@@ -60,7 +60,7 @@ Minimal configuration:
 ```yaml
 type: custom:hk-ha-bus-card
 title: HK HA Bus Card
-session_key: hk_ha_bus_card
+session_key: auto
 update_interval: 30
 session_minutes: 15
 display_window: 30
@@ -108,7 +108,7 @@ pressed on the dashboard.
 | Option | Default | Description |
 | --- | ---: | --- |
 | `title` | `HK HA Bus Card` | Card title |
-| `session_key` | `hk_ha_bus_card` | Allows multiple cards in the same browser to share one query session |
+| `session_key` | `auto` | Automatically isolates sessions according to each card's directions and routes |
 | `update_interval` | `30` | Refresh interval in seconds; minimum 10 seconds |
 | `session_minutes` | `15` | Number of minutes before queries stop automatically |
 | `display_window` | `30` | Only display arrivals within this many minutes |
@@ -116,8 +116,10 @@ pressed on the dashboard.
 | `max_arrivals` | `3` | Maximum number of arrivals to display per route |
 | `directions` | `[]` | Direction and route settings created by the Card Editor |
 
-Use different `session_key` values if two cards should query independently.
-Use the same `session_key` if they should connect to the same query session.
+With `auto`, cards containing different directions or routes query independently,
+while the same card can still reconnect to its session after a view change or
+reload. To intentionally share a query between several cards, give them the
+same custom `session_key`; use different keys to keep them independent.
 
 ## Query behaviour
 
@@ -142,7 +144,10 @@ closed, keep the query scheduler in Home Assistant or Node-RED.
   browser cache and reload.
 - **The old card is still loaded**: increase the version number at the end of
   the resource URL, for example
-  `/local/community/hk-ha-bus-card/hk-ha-bus-card.js?v=1.3.2`.
+  `/local/community/hk-ha-bus-card/hk-ha-bus-card.js?v=1.3.3`.
+- **Cards on different pages show the same query result**: upgrade to 1.3.2 and
+  set `session_key` to `auto`. The legacy default `hk_ha_bus_card` is also
+  treated as `auto` automatically.
 - **The card is clipped in a Sections view**: enter dashboard edit mode, open
   the card menu, and select **Reset size**. If the YAML contains a saved
   `grid_options.rows` value, remove `rows`.

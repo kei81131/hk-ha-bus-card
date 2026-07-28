@@ -44,7 +44,7 @@ Home Assistant Custom Card 可以直接查詢香港九巴、城巴、嶼巴、�
 2. 去 **Settings > Dashboards > Resources**，加入 JavaScript Module：
 
    ```text
-   /local/community/hk-ha-bus-card/hk-ha-bus-card.js?v=1.3.1
+   /local/community/hk-ha-bus-card/hk-ha-bus-card.js?v=1.3.2
    ```
 
 3. 清除瀏覽器快取並重新載入。Home Assistant Companion App 如仍然使用
@@ -58,7 +58,7 @@ Home Assistant Custom Card 可以直接查詢香港九巴、城巴、嶼巴、�
 ```yaml
 type: custom:hk-ha-bus-card
 title: HK HA Bus Card
-session_key: hk_ha_bus_card
+session_key: auto
 update_interval: 30
 session_minutes: 15
 display_window: 30
@@ -100,7 +100,7 @@ Card 會儲存所選路線巴士站嘅官方名稱。唔需要手動輸入共用
 | 選項 | 預設值 | 說明 |
 | --- | ---: | --- |
 | `title` | `HK HA Bus Card` | Card 標題 |
-| `session_key` | `hk_ha_bus_card` | 讓同一瀏覽器內多張 Card 共用一個查詢 Session |
+| `session_key` | `auto` | 自動按每張 Card 嘅方向及路線分隔查詢 Session |
 | `update_interval` | `30` | 更新間隔秒數，最低 10 秒 |
 | `session_minutes` | `15` | 幾多分鐘後自動停止查詢 |
 | `display_window` | `30` | 只顯示呢個分鐘範圍內嘅班次 |
@@ -108,8 +108,9 @@ Card 會儲存所選路線巴士站嘅官方名稱。唔需要手動輸入共用
 | `max_arrivals` | `3` | 每條路線最多顯示幾班車 |
 | `directions` | `[]` | 由 Card Editor 建立嘅方向及路線設定 |
 
-如果兩張 Card 要獨立查詢，請使用不同 `session_key`。如果兩張 Card 應該
-接駁同一個查詢 Session，就使用相同 `session_key`。
+使用 `auto` 時，方向或路線設定不同嘅 Card 會自動獨立查詢；同一張 Card
+切換 View 或重新載入後，仍然可以接駁原有 Session。如果想刻意令幾張 Card
+共用查詢，先為佢哋手動設定相同 `session_key`；設定不同 Key 就會保持獨立。
 
 ## 查詢運作方式
 
@@ -130,7 +131,10 @@ Card 會儲存所選路線巴士站嘅官方名稱。唔需要手動輸入共用
 - **顯示 Custom element doesn't exist**：檢查 Resource 路徑，然後清除
   瀏覽器快取並重新載入。
 - **仍然載入舊 Card**：增加 Resource URL 後面嘅版本號，例如
-  `/local/community/hk-ha-bus-card/hk-ha-bus-card.js?v=1.3.2`。
+  `/local/community/hk-ha-bus-card/hk-ha-bus-card.js?v=1.3.3`。
+- **不同頁面嘅 Card 顯示同一個查詢結果**：升級至 1.3.2，並將
+  `session_key` 設成 `auto`。舊預設值 `hk_ha_bus_card` 亦會自動當成
+  `auto` 處理。
 - **Sections View 入面 Card 被裁切**：進入 Dashboard 編輯模式，開啟 Card
   選單並選擇 **Reset size**。如果 YAML 內有已儲存嘅
   `grid_options.rows`，請移除 `rows`。

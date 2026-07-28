@@ -1,4 +1,4 @@
-const HK_HA_BUS_CARD_VERSION = "1.3.1";
+const HK_HA_BUS_CARD_VERSION = "1.3.2";
 const KMB_API = "https://data.etabus.gov.hk/v1/transport/kmb";
 const GMB_API = "https://data.etagmb.gov.hk";
 const CTB_API = "https://rt.data.gov.hk/v2/transport/citybus";
@@ -20,7 +20,7 @@ const operatorInfo = (operator) => OPERATOR_INFO[operator] || {
 const DEFAULT_CONFIG = {
   type: "custom:hk-ha-bus-card",
   title: "HK HA Bus Card",
-  session_key: "hk_ha_bus_card",
+  session_key: "auto",
   update_interval: 30,
   session_minutes: 15,
   display_window: 30,
@@ -48,6 +48,32 @@ const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => 
   "'": "&#039;"
 })[char]);
 
+function hashSessionIdentity(value) {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(36);
+}
+
+function resolveSessionKey(config = {}) {
+  const requested = String(config.session_key || "auto").trim();
+  if (requested && requested !== "auto" && requested !== "hk_ha_bus_card") {
+    return requested;
+  }
+  const identity = JSON.stringify({
+    title: config.title,
+    update_interval: config.update_interval,
+    session_minutes: config.session_minutes,
+    display_window: config.display_window,
+    max_routes: config.max_routes,
+    max_arrivals: config.max_arrivals,
+    directions: config.directions
+  });
+  return `auto_${hashSessionIdentity(identity)}`;
+}
+
 function normalizeRouteConfig(route = {}) {
   return {
     ...route,
@@ -73,7 +99,10 @@ function normalizeConfig(config = {}) {
   };
 
   merged.update_interval = Math.max(10, finiteNumber(merged.update_interval, 30));
-  merged.session_key = String(merged.session_key || "hk_ha_bus_card");
+  const requestedSessionKey = String(merged.session_key || "auto").trim();
+  merged.session_key = !requestedSessionKey || requestedSessionKey === "hk_ha_bus_card"
+    ? "auto"
+    : requestedSessionKey;
   merged.session_minutes = Math.max(1, finiteNumber(merged.session_minutes, 15));
   merged.display_window = Math.max(5, finiteNumber(merged.display_window, 30));
   merged.max_routes = Math.max(1, finiteNumber(merged.max_routes, 3));
@@ -127,7 +156,7 @@ class HkHaBusCard extends HTMLElement {
     this._clockTimer = null;
     this._requestController = null;
     this._connected = false;
-    this._sessionKey = this._config.session_key;
+    this._sessionKey = resolveSessionKey(this._config);
     this._onVisibilityChange = this._handleVisibilityChange.bind(this);
   }
 
@@ -144,7 +173,8 @@ class HkHaBusCard extends HTMLElement {
       throw new Error("Invalid HK HA Bus Card configuration");
     }
     const normalized = normalizeConfig(config);
-    if (this._sessionKey && this._sessionKey !== normalized.session_key) {
+    const nextSessionKey = resolveSessionKey(normalized);
+    if (this._sessionKey && this._sessionKey !== nextSessionKey) {
       const oldEntry = HK_HA_BUS_SESSIONS.get(this._sessionKey);
       oldEntry?.subscribers.delete(this);
       if (oldEntry?.owner === this) {
@@ -153,7 +183,7 @@ class HkHaBusCard extends HTMLElement {
       }
     }
     this._config = normalized;
-    this._sessionKey = normalized.session_key;
+    this._sessionKey = nextSessionKey;
     if (this._connected) {
       const entry = this._sessionEntry();
       entry.subscribers.add(this);
@@ -216,15 +246,15 @@ class HkHaBusCard extends HTMLElement {
   }
 
   _sessionEntry() {
-    const key = this._sessionKey || this._config.session_key || "hk_ha_bus_card";
+    const key = this._sessionKey || resolveSessionKey(this._config);
     if (!HK_HA_BUS_SESSIONS.has(key)) {
       HK_HA_BUS_SESSIONS.set(key, {owner: null, subscribers: new Set()});
     }
     return HK_HA_BUS_SESSIONS.get(key);
   }
 
-  _storageKey(key = this._sessionKey || this._config.session_key) {
-    return `hk-ha-bus-card:session:${key || "hk_ha_bus_card"}`;
+  _storageKey(key = this._sessionKey || resolveSessionKey(this._config)) {
+    return `hk-ha-bus-card:session:${key || resolveSessionKey(this._config)}`;
   }
 
   _persistSession() {
@@ -1460,7 +1490,7 @@ class HkHaBusCardEditor extends HTMLElement {
       <div class="editor">
         <div class="grid two">
           <label>標題<input data-config-field="title" value="${escapeHtml(this._config.title)}"></label>
-          <label>共享 Session Key<input data-config-field="session_key" value="${escapeHtml(this._config.session_key)}"></label>
+          <label>Session Key（auto 會按 Card 設定自動分隔）<input data-config-field="session_key" value="${escapeHtml(this._config.session_key)}"></label>
           <label>更新間隔（秒）<input type="number" min="10" data-config-field="update_interval" value="${this._config.update_interval}"></label>
           <label>查詢時間（分鐘）<input type="number" min="1" data-config-field="session_minutes" value="${this._config.session_minutes}"></label>
           <label>顯示範圍（分鐘）<input type="number" min="5" data-config-field="display_window" value="${this._config.display_window}"></label>
@@ -1469,7 +1499,7 @@ class HkHaBusCardEditor extends HTMLElement {
         </div>
         ${directionEditors}
         <button class="add-direction" data-add-direction>新增方向</button>
-        <div class="hint">支援九巴、城巴、專線小巴及嶼巴；九巴與城巴聯營路線會自動合併。顯示站名會直接使用每條路線所選巴士站；ETA 仍然只會在 Dashboard 按方向掣後查詢。</div>
+        <div class="hint">支援九巴、城巴、專線小巴及嶼巴；九巴與城巴聯營路線會自動合併。預設 Session Key 使用 auto，不同設定嘅 Card 唔會互相同步；如要刻意共用查詢，先手動填入相同 Key。ETA 仍然只會在 Dashboard 按方向掣後查詢。</div>
       </div>`;
 
     this.shadowRoot.querySelectorAll("[data-config-field]").forEach((input) => {
@@ -1575,15 +1605,18 @@ function resumePersistedHkHaBusSessions() {
         storage.removeItem(storageKey);
         continue;
       }
-      const sessionKey = storageKey.slice(prefix.length);
-      const entry = HK_HA_BUS_SESSIONS.get(sessionKey);
-      if (entry?.owner) continue;
+      const storedSessionKey = storageKey.slice(prefix.length);
       const owner = new HkHaBusCard();
       owner.setConfig({
         ...snapshot.config,
-        type: "custom:hk-ha-bus-card",
-        session_key: sessionKey
+        type: "custom:hk-ha-bus-card"
       });
+      if (owner._sessionKey !== storedSessionKey) {
+        storage.removeItem(storageKey);
+        continue;
+      }
+      const entry = HK_HA_BUS_SESSIONS.get(storedSessionKey);
+      if (entry?.owner) continue;
       owner._restorePersistedSession(owner._sessionEntry());
     }
   } catch (error) {

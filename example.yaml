@@ -1,6 +1,6 @@
 type: custom:hk-ha-bus-card
 title: HK HA Bus Card
-session_key: hk_ha_bus_card
+session_key: auto
 update_interval: 30
 session_minutes: 15
 display_window: 30
